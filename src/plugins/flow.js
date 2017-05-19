@@ -365,7 +365,7 @@ pp.flowParseObjectTypeMethodish = function (node) {
   }
 
   this.expect(tt.parenL);
-  while (this.match(tt.name)) {
+  while (!this.match(tt.parenR) && !this.match(tt.ellipsis)) {
     node.params.push(this.flowParseFunctionTypeParam());
     if (!this.match(tt.parenR)) {
       this.expect(tt.comma);
