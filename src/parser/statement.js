@@ -199,8 +199,13 @@ export default class StatementParser extends ExpressionParser {
     ];
     if (decorators.length) {
       node.decorators = decorators;
-      this.resetStartLocationFromNode(node, decorators[0]);
       this.state.decoratorStack[this.state.decoratorStack.length - 1] = [];
+    }
+  }
+
+  fixNodeLocationWithDecorators(node: N.HasDecorators): void {
+    if (node.decorators && node.decorators.length) {
+      this.resetStartLocationFromNode(node, node.decorators[0]);
     }
   }
 
@@ -827,10 +832,15 @@ export default class StatementParser extends ExpressionParser {
     this.parseClassId(node, isStatement, optionalId);
     this.parseClassSuper(node);
     this.parseClassBody(node);
-    return this.finishNode(
+    node = this.finishNode(
       node,
       isStatement ? "ClassDeclaration" : "ClassExpression",
     );
+
+    // Do this after the class is finished so that comments get correctly attached
+    this.fixNodeLocationWithDecorators(node);
+
+    return node;
   }
 
   isClassProperty(): boolean {
@@ -882,14 +892,21 @@ export default class StatementParser extends ExpressionParser {
 
       const member = this.startNode();
 
+      this.parseClassMember(classBody, member, state);
+
       // steal the decorators if there are any
+      // Do this after parsing the member so that the comment attachment correctly attaches comments
       if (decorators.length) {
         member.decorators = decorators;
         this.resetStartLocationFromNode(member, decorators[0]);
         decorators = [];
+        if (this.isNonstaticConstructor(member)) {
+          this.raise(
+            member.start,
+            "You can't attach decorators to a class constructor",
+          );
+        }
       }
-
-      this.parseClassMember(classBody, member, state);
 
       if (
         this.hasPlugin("decorators2") &&
@@ -1020,13 +1037,6 @@ export default class StatementParser extends ExpressionParser {
 
       if (isConstructor) {
         publicMethod.kind = "constructor";
-
-        if (publicMethod.decorators) {
-          this.raise(
-            publicMethod.start,
-            "You can't attach decorators to a class constructor",
-          );
-        }
 
         // TypeScript allows multiple overloaded constructor declarations.
         if (state.hadConstructor && !this.hasPlugin("typescript")) {
@@ -1317,8 +1327,10 @@ export default class StatementParser extends ExpressionParser {
       }
       node.declaration = expr;
       if (needsSemi) this.semicolon();
+      node = this.finishNode(node, "ExportDefaultDeclaration");
+      // Do this after the node is finished so that comments get attached correctly
       this.checkExport(node, true, true);
-      return this.finishNode(node, "ExportDefaultDeclaration");
+      return node;
     } else if (this.shouldParseExportDeclaration()) {
       if (this.isContextual("async")) {
         const next = this.lookahead();
