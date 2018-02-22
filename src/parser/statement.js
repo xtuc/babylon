@@ -305,8 +305,8 @@ export default class StatementParser extends ExpressionParser {
         if (node.label && isBreak) break;
       }
     }
-    if (i === this.state.labels.length)
-      this.raise(node.start, "Unsyntactic " + keyword);
+    // if (i === this.state.labels.length)
+    //   this.raise(node.start, "Unsyntactic " + keyword);
     return this.finishNode(
       node,
       isBreak ? "BreakStatement" : "ContinueStatement",
